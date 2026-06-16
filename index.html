@@ -111,14 +111,14 @@ h1{font-family:var(--font-serif);font-weight:700;color:var(--navy);font-size:28p
 const AGENTS = [
   {id:'redes',     name:'Redes',     role:'Contenido y marca'},
   {id:'video',     name:'Video',     role:'Motion graphics'},
-  {id:'diseno',    name:'Diseno',    role:'Brandbooks'},
+  {id:'diseno',    name:'Diseño',    role:'Brandbooks'},
   {id:'finanzas',  name:'Finanzas',  role:'Reportes'},
   {id:'datos',     name:'Datos',     role:'RAG y tareas'},
-  {id:'contenido', name:'Contenido', role:'Edicion video'},
+  {id:'contenido', name:'Contenido', role:'Edición de video'},
   {id:'diagramas', name:'Diagramas', role:'Flujos a PNG'},
-  {id:'reuniones', name:'Reuniones', role:'Transcripcion'},
+  {id:'reuniones', name:'Reuniones', role:'Transcripción'},
   {id:'bridge',    name:'Bridge',    role:'Agentes IA'},
-  {id:'n8ndocs',   name:'n8n-docs',  role:'Documentar wf'},
+  {id:'n8ndocs',   name:'n8n-docs',  role:'Documentación de wf'},
 ];
 const SVGNS='http://www.w3.org/2000/svg';
 const CX=450, CY=320, R=235, ROCKY_R=70, NODE_R=34;
@@ -223,8 +223,8 @@ setTheme((()=>{try{return localStorage.getItem('visorTheme')||'light'}catch(e){r
 
 /* demo scenario: una orquestacion real (delegacion al agente de diagramas) */
 const STEPS=[
-  {d:1400, fn:()=>viz.request('Agustin: necesito un diagrama de como funciona la orquestacion de subagentes')},
-  {d:1800, fn:()=>viz.delegate('diagramas','arma un flujo Agustin &rarr; Rocky &rarr; especialistas y rinde a PNG')},
+  {d:1400, fn:()=>viz.request('Agustin: necesito un diagrama de cómo funciona la orquestación de subagentes')},
+  {d:1800, fn:()=>viz.delegate('diagramas','arma un flujo Agustin → Rocky → especialistas y ríndelo a PNG')},
   {d:2000, fn:()=>viz.agentMsg('diagramas','escribo el .d2 y corro el render')},
   {d:2200, fn:()=>viz.done('diagramas','PNG renderizado (orquestador.png)')},
   {d:1600, fn:()=>viz.deliver('Rocky: diagrama listo y enviado por Telegram')},
