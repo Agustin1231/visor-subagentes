@@ -59,6 +59,9 @@ h1{font-family:var(--font-serif);font-weight:700;color:var(--navy);font-size:28p
 .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;background:var(--light-gray);color:var(--dark-gray)}
 .tag.b{background:var(--blue-100);color:var(--blue-700)}
 .tag.g{background:var(--green-soft);color:var(--green)}
+.children{margin:0 0 5px 22px;padding-left:14px;border-left:2px solid var(--line)}
+.children .entry{font-size:12px;padding:6px 9px;margin:2px 0}
+.children .entry .t{min-width:48px;font-size:10px}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 /* nodes */
 .node-label{font-family:var(--font-sans);font-weight:600;font-size:12.5px;fill:var(--navy)}
@@ -170,11 +173,23 @@ function mask(s){
     .replace(/\b\d{9,}\b/g, '****');
 }
 function safe(s){return esc(mask(s));}
-function log(body,kind='',tag,tagcls=''){
+let currentGroup=null; // contenedor de sub-acciones del llamado vigente
+function makeEntry(body,kind,tag,tagcls){
   const e=document.createElement('div');e.className='entry '+kind;
   const tagHtml=tag?`<span class="tag ${tagcls}">${tag}</span>`:'';
   e.innerHTML=`<div class="t">${now()}</div><div class="b">${tagHtml}${body}</div>`;
-  logEl.appendChild(e);logEl.scrollTop=logEl.scrollHeight;
+  return e;
+}
+// Entrada de primer nivel (solicitud, llamado a subagente, entrega).
+function logTop(body,kind='',tag,tagcls=''){
+  currentGroup=null;
+  logEl.appendChild(makeEntry(body,kind,tag,tagcls));
+  logEl.scrollTop=logEl.scrollHeight;
+}
+// Sub-accion tabulada debajo del llamado vigente.
+function logChild(body,kind='',tag,tagcls=''){
+  (currentGroup||logEl).appendChild(makeEntry(body,kind,tag,tagcls));
+  logEl.scrollTop=logEl.scrollHeight;
 }
 
 let dotTimers={};
@@ -190,9 +205,9 @@ function flow(id){
 }
 
 window.viz={
-  reset(){build();logEl.innerHTML='';document.getElementById('rocky').classList.remove('busy');},
+  reset(){build();logEl.innerHTML='';currentGroup=null;document.getElementById('rocky').classList.remove('busy');},
   rockyBusy(b){document.getElementById('rocky').classList.toggle('busy',b);},
-  request(text){this.rockyBusy(true);log(safe(text),'req','Solicitud','b');},
+  request(text){this.rockyBusy(true);logTop(safe(text),'req','Solicitud','b');},
   delegate(id,text){
     const a=AGENTS.find(x=>x.id===id);
     document.getElementById('edge-'+id).classList.add('active');
@@ -200,17 +215,20 @@ window.viz={
     document.getElementById('badge-'+id).textContent='trabajando';
     document.getElementById('badge-'+id).setAttribute('fill','var(--blue-600)');
     flow(id);
-    log(`<b>Rocky &rarr; ${esc(a.name)}</b>: ${safe(text)}`,'work','Delegado','b');
+    // El llamado al subagente es la entrada principal; sus acciones van tabuladas debajo.
+    logTop(`<b>Rocky &rarr; ${esc(a.name)}</b>: ${safe(text)}`,'work','Delegado','b');
+    const kids=document.createElement('div');kids.className='children';
+    logEl.appendChild(kids);currentGroup=kids;
   },
-  agentMsg(id,text){const a=AGENTS.find(x=>x.id===id);log(`<b>${esc(a.name)}</b>: ${safe(text)}`,'work');},
+  agentMsg(id,text){const a=AGENTS.find(x=>x.id===id);logChild(`<b>${esc(a.name)}</b>: ${safe(text)}`,'work');},
   done(id,text){
     const a=AGENTS.find(x=>x.id===id);
     const n=document.getElementById('node-'+id);n.classList.remove('active');n.classList.add('done');
     document.getElementById('edge-'+id).classList.remove('active');
     const b=document.getElementById('badge-'+id);b.textContent='listo';b.setAttribute('fill','var(--green)');
-    log(`<b>${esc(a.name)}</b>: ${safe(text)}`,'done','Listo','g');
+    logChild(`<b>${esc(a.name)}</b>: ${safe(text)}`,'done','Listo','g');
   },
-  deliver(text){this.rockyBusy(false);log(safe(text),'done','Rocky','g');},
+  deliver(text){this.rockyBusy(false);logTop(safe(text),'done','Rocky','g');},
 };
 
 /* theme */
@@ -223,11 +241,14 @@ setTheme((()=>{try{return localStorage.getItem('visorTheme')||'light'}catch(e){r
 
 /* demo scenario: una orquestacion real (delegacion al agente de diagramas) */
 const STEPS=[
-  {d:1400, fn:()=>viz.request('Agustin: necesito un diagrama de cómo funciona la orquestación de subagentes')},
-  {d:1800, fn:()=>viz.delegate('diagramas','arma un flujo Agustin → Rocky → especialistas y ríndelo a PNG')},
-  {d:2000, fn:()=>viz.agentMsg('diagramas','escribo el .d2 y corro el render')},
-  {d:2200, fn:()=>viz.done('diagramas','PNG renderizado (orquestador.png)')},
-  {d:1600, fn:()=>viz.deliver('Rocky: diagrama listo y enviado por Telegram')},
+  {d:1200, fn:()=>viz.request('Agustin: arma un reel explicando la orquestación de subagentes y mándalo')},
+  {d:1500, fn:()=>viz.delegate('diagramas','arma un flujo Agustin → Rocky → especialistas y ríndelo a PNG')},
+  {d:1500, fn:()=>viz.agentMsg('diagramas','escribo el .d2 y corro el render')},
+  {d:1500, fn:()=>viz.done('diagramas','PNG renderizado (orquestador.png)')},
+  {d:1600, fn:()=>viz.delegate('video','con ese diagrama arma un motion graphic vertical narrado')},
+  {d:1500, fn:()=>viz.agentMsg('video','clono la voz y animo las escenas por subagente')},
+  {d:1500, fn:()=>viz.done('video','reel listo (orquestacion.mp4)')},
+  {d:1500, fn:()=>viz.deliver('Rocky: reel terminado y enviado por Telegram')},
 ];
 let playTimers=[];
 const replayBtn=document.getElementById('replayBtn');
