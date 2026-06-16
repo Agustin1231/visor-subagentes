@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rocky · Orquestador de subagentes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --white:#FFFFFF; --off-white:#F8FAFB; --light-gray:#E8EDF2; --gray:#B8C5D0;
+  --dark-gray:#647987; --charcoal:#2C3E50; --navy:#1A2332;
+  --blue-50:#EBF5FF; --blue-100:#D6EBFF; --blue-500:#2B7DE9; --blue-600:#1B5FCF; --blue-700:#154AB5;
+  --green:#1AA06D; --green-soft:rgba(26,160,109,.14);
+  --font-serif:'Playfair Display',Georgia,serif;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --shadow-sm:0 2px 8px rgba(26,35,50,.05); --shadow-md:0 4px 16px rgba(26,35,50,.08); --shadow-lg:0 8px 32px rgba(26,35,50,.12);
+  --bg:#FFFFFF; --panel:#FFFFFF; --line:#E8EDF2; --idle:#B8C5D0;
+}
+[data-theme="dark"]{
+  --white:#1A1F2E; --off-white:#151925; --light-gray:#2A3040; --gray:#4A5568;
+  --dark-gray:#A0AEC0; --charcoal:#CBD5E0; --navy:#E2E8F0;
+  --blue-50:rgba(43,125,233,.1); --blue-100:rgba(43,125,233,.15); --blue-500:#4A9AF5; --blue-600:#5BA8FF; --blue-700:#6DB5FF;
+  --green:#3DD98B; --green-soft:rgba(61,217,139,.16);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.2); --shadow-md:0 4px 16px rgba(0,0,0,.25); --shadow-lg:0 8px 32px rgba(0,0,0,.3);
+  --bg:#0F1219; --panel:#151925; --line:#2A3040; --idle:#3A4456;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--charcoal);min-height:100vh;transition:background .4s,color .4s}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 32px 40px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.brand{display:flex;align-items:baseline;gap:14px}
+h1{font-family:var(--font-serif);font-weight:700;color:var(--navy);font-size:28px;letter-spacing:-.3px}
+.sub{color:var(--dark-gray);font-size:14px;font-weight:500}
+.toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--charcoal);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);transition:.25s}
+.toggle:hover{border-color:var(--blue-500);color:var(--blue-600)}
+.toggle svg{width:20px;height:20px}
+.layout{display:grid;grid-template-columns:1fr 360px;gap:24px;margin-top:22px}
+@media(max-width:980px){.layout{grid-template-columns:1fr}}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-md);padding:10px;position:relative;overflow:hidden}
+.stage svg{width:100%;height:auto;display:block}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-md);display:flex;flex-direction:column;overflow:hidden}
+.panel h2{font-family:var(--font-serif);font-size:17px;color:var(--navy);padding:18px 20px 12px;border-bottom:1px solid var(--line);font-weight:600}
+.log{flex:1;overflow:auto;padding:8px 10px;max-height:520px}
+.entry{display:flex;gap:10px;padding:9px 10px;border-radius:10px;margin:3px 0;font-size:13px;line-height:1.45;animation:in .35s ease}
+.entry .t{color:var(--dark-gray);font-variant-numeric:tabular-nums;font-size:11px;padding-top:2px;min-width:52px}
+.entry .b{flex:1;color:var(--charcoal)}
+.entry .b b{color:var(--navy);font-weight:600}
+.entry.req{background:var(--blue-50)}
+.entry.work .b b{color:var(--blue-600)}
+.entry.done{background:var(--green-soft)}
+.entry.done .b b{color:var(--green)}
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;background:var(--light-gray);color:var(--dark-gray)}
+.tag.b{background:var(--blue-100);color:var(--blue-700)}
+.tag.g{background:var(--green-soft);color:var(--green)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* nodes */
+.node-label{font-family:var(--font-sans);font-weight:600;font-size:12.5px;fill:var(--navy)}
+.node-role{font-family:var(--font-sans);font-weight:500;font-size:10px;fill:var(--dark-gray)}
+.mono{font-family:var(--font-sans);font-weight:700;font-size:15px;fill:var(--dark-gray)}
+.edge{stroke:var(--line);stroke-width:2;fill:none;transition:stroke .3s}
+.edge.active{stroke:var(--blue-500);stroke-width:2.6}
+.ring{fill:var(--panel);stroke:var(--idle);stroke-width:2.4;transition:stroke .3s,filter .3s}
+.node.active .ring{stroke:var(--blue-500);filter:drop-shadow(0 0 9px var(--blue-500))}
+.node.done .ring{stroke:var(--green)}
+.node.active .mono{fill:var(--blue-600)}
+.node.done .mono{fill:var(--green)}
+.rocky-ring{fill:var(--panel);stroke:var(--blue-500);stroke-width:3}
+.rocky.busy .rocky-ring{filter:drop-shadow(0 0 16px var(--blue-500));animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{stroke-width:3}50%{stroke-width:5}}
+.rocky-name{font-family:var(--font-serif);font-weight:700;font-size:20px;fill:var(--navy);text-anchor:middle}
+.rocky-tag{font-family:var(--font-sans);font-weight:600;font-size:11px;fill:var(--blue-600);text-anchor:middle;letter-spacing:.5px;text-transform:uppercase}
+.pulse-dot{fill:var(--blue-500)}
+.statebadge{font-family:var(--font-sans);font-weight:600;font-size:9.5px;text-anchor:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Rocky</h1>
+      <span class="sub">Orquestador de subagentes · en vivo</span>
+    </div>
+    <button class="toggle" id="themeBtn" title="Cambiar tema"></button>
+  </header>
+
+  <div class="layout">
+    <div class="stage">
+      <svg id="graph" viewBox="0 0 900 640" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="panel">
+      <h2>Actividad</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AGENTS = [
+  {id:'redes',     name:'Redes',     role:'Contenido y marca'},
+  {id:'video',     name:'Video',     role:'Motion graphics'},
+  {id:'diseno',    name:'Diseno',    role:'Brandbooks'},
+  {id:'finanzas',  name:'Finanzas',  role:'Reportes'},
+  {id:'datos',     name:'Datos',     role:'RAG y tareas'},
+  {id:'contenido', name:'Contenido', role:'Edicion video'},
+  {id:'diagramas', name:'Diagramas', role:'Flujos a PNG'},
+  {id:'reuniones', name:'Reuniones', role:'Transcripcion'},
+  {id:'bridge',    name:'Bridge',    role:'Agentes IA'},
+  {id:'n8ndocs',   name:'n8n-docs',  role:'Documentar wf'},
+];
+const SVGNS='http://www.w3.org/2000/svg';
+const CX=450, CY=320, R=235, ROCKY_R=70, NODE_R=34;
+const svg=document.getElementById('graph');
+const logEl=document.getElementById('log');
+const pos={};
+
+function el(tag,attrs={},txt){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(txt!=null)e.textContent=txt;return e;}
+
+function monogram(a){return a.name.replace('n8n-docs','N8').slice(0,2).toUpperCase();}
+
+function build(){
+  svg.innerHTML='';
+  const edges=el('g',{id:'edges'}); svg.appendChild(edges);
+  AGENTS.forEach((a,i)=>{
+    const ang=(-90 + i*(360/AGENTS.length))*Math.PI/180;
+    const x=CX+R*Math.cos(ang), y=CY+R*Math.sin(ang);
+    pos[a.id]={x,y};
+    const path=`M${CX},${CY} L${x},${y}`;
+    edges.appendChild(el('path',{class:'edge',id:'edge-'+a.id,d:path}));
+  });
+  AGENTS.forEach(a=>{
+    const {x,y}=pos[a.id];
+    const g=el('g',{class:'node',id:'node-'+a.id});
+    g.appendChild(el('circle',{class:'ring',cx:x,cy:y,r:NODE_R}));
+    g.appendChild(el('text',{class:'mono','text-anchor':'middle',x:x,y:y+5},monogram(a)));
+    g.appendChild(el('text',{class:'node-label','text-anchor':'middle',x:x,y:y+NODE_R+18},a.name));
+    g.appendChild(el('text',{class:'node-role','text-anchor':'middle',x:x,y:y+NODE_R+33},a.role));
+    g.appendChild(el('text',{class:'statebadge',id:'badge-'+a.id,x:x,y:y-NODE_R-9},''));
+    svg.appendChild(g);
+  });
+  const r=el('g',{class:'rocky',id:'rocky'});
+  r.appendChild(el('circle',{class:'rocky-ring',cx:CX,cy:CY,r:ROCKY_R}));
+  r.appendChild(el('text',{class:'rocky-name',x:CX,y:CY-2},'Rocky'));
+  r.appendChild(el('text',{class:'rocky-tag',x:CX,y:CY+18},'Orquestador'));
+  svg.appendChild(r);
+}
+
+function now(){const d=new Date();return d.toLocaleTimeString('es-CO',{hour12:false});}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Oculta datos sensibles del log con asteriscos antes de mostrarlos.
+function mask(s){
+  if(s==null)return s;
+  return String(s)
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, m=>m[0]+'****@****')
+    .replace(/\/(?:home|root|srv|etc|var)\/[^\s)<]+/g, '/****')
+    .replace(/\b(?:Bearer|token|apikey|app[_-]?key|password|secret)\b\s*[:=]?\s*\S+/gi, m=>m.split(/[:=\s]/)[0]+' ****')
+    .replace(/\b[A-Za-z0-9_-]{20,}\b/g, m=>m.slice(0,3)+'****')
+    .replace(/\b\d{9,}\b/g, '****');
+}
+function safe(s){return esc(mask(s));}
+function log(body,kind='',tag,tagcls=''){
+  const e=document.createElement('div');e.className='entry '+kind;
+  const tagHtml=tag?`<span class="tag ${tagcls}">${tag}</span>`:'';
+  e.innerHTML=`<div class="t">${now()}</div><div class="b">${tagHtml}${body}</div>`;
+  logEl.appendChild(e);logEl.scrollTop=logEl.scrollHeight;
+}
+
+let dotTimers={};
+function flow(id){
+  const edge=document.getElementById('edge-'+id);if(!edge)return;
+  const len=edge.getTotalLength();
+  const dot=el('circle',{class:'pulse-dot',r:5});svg.appendChild(dot);
+  let start=null;const dur=900;
+  function step(ts){if(!start)start=ts;const p=Math.min((ts-start)/dur,1);
+    const pt=edge.getPointAtLength(p*len);dot.setAttribute('cx',pt.x);dot.setAttribute('cy',pt.y);
+    if(p<1)requestAnimationFrame(step);else dot.remove();}
+  requestAnimationFrame(step);
+}
+
+window.viz={
+  reset(){build();logEl.innerHTML='';document.getElementById('rocky').classList.remove('busy');},
+  rockyBusy(b){document.getElementById('rocky').classList.toggle('busy',b);},
+  request(text){this.rockyBusy(true);log(safe(text),'req','Solicitud','b');},
+  delegate(id,text){
+    const a=AGENTS.find(x=>x.id===id);
+    document.getElementById('edge-'+id).classList.add('active');
+    const n=document.getElementById('node-'+id);n.classList.remove('done');n.classList.add('active');
+    document.getElementById('badge-'+id).textContent='trabajando';
+    document.getElementById('badge-'+id).setAttribute('fill','var(--blue-600)');
+    flow(id);
+    log(`<b>Rocky &rarr; ${esc(a.name)}</b>: ${safe(text)}`,'work','Delegado','b');
+  },
+  agentMsg(id,text){const a=AGENTS.find(x=>x.id===id);log(`<b>${esc(a.name)}</b>: ${safe(text)}`,'work');},
+  done(id,text){
+    const a=AGENTS.find(x=>x.id===id);
+    const n=document.getElementById('node-'+id);n.classList.remove('active');n.classList.add('done');
+    document.getElementById('edge-'+id).classList.remove('active');
+    const b=document.getElementById('badge-'+id);b.textContent='listo';b.setAttribute('fill','var(--green)');
+    log(`<b>${esc(a.name)}</b>: ${safe(text)}`,'done','Listo','g');
+  },
+  deliver(text){this.rockyBusy(false);log(safe(text),'done','Rocky','g');},
+};
+
+/* theme */
+const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>';
+const btn=document.getElementById('themeBtn');
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);btn.innerHTML=t==='dark'?sun:moon;try{localStorage.setItem('visorTheme',t)}catch(e){}}
+btn.onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+setTheme((()=>{try{return localStorage.getItem('visorTheme')||'light'}catch(e){return 'light'}})());
+
+build();
+</script>
+</body>
+</html>
