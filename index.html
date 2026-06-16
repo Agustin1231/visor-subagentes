@@ -239,32 +239,110 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);btn.i
 btn.onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
 setTheme((()=>{try{return localStorage.getItem('visorTheme')||'light'}catch(e){return 'light'}})());
 
-/* demo scenario: una orquestacion real (delegacion al agente de diagramas) */
-const STEPS=[
-  {d:1200, fn:()=>viz.request('Agustin: arma un reel explicando la orquestación de subagentes y mándalo')},
-  {d:1500, fn:()=>viz.delegate('diagramas','arma un flujo Agustin → Rocky → especialistas y ríndelo a PNG')},
-  {d:1500, fn:()=>viz.agentMsg('diagramas','escribo el .d2 y corro el render')},
-  {d:1500, fn:()=>viz.done('diagramas','PNG renderizado (orquestador.png)')},
-  {d:1600, fn:()=>viz.delegate('video','con ese diagrama arma un motion graphic vertical narrado')},
-  {d:1500, fn:()=>viz.agentMsg('video','clono la voz y animo las escenas por subagente')},
-  {d:1500, fn:()=>viz.done('video','reel listo (orquestacion.mp4)')},
-  {d:1500, fn:()=>viz.deliver('Rocky: reel terminado y enviado por Telegram')},
-];
+/* Banco de tareas por subagente. Cada tarea: lo que pide Agustin (req), la
+   instruccion de Rocky al especialista (inst), 1-2 mensajes de trabajo (act),
+   el resultado (done) y la entrega final (deliver). Algunas incluyen datos
+   sensibles a proposito (correos, tokens, rutas, numeros) para que se vea el
+   censurado con asteriscos. Un generador elige una al azar y la anima en bucle. */
+const TASKS={
+  redes:[
+    {req:'prográmame el contenido de esta semana en LinkedIn e Instagram', inst:'arma la parrilla semanal y deja los borradores', act:['reviso la parrilla en Outline','defino formatos: carrusel y día a día'], done:'5 publicaciones listas en borrador', deliver:'Rocky: parrilla de la semana lista para tu revisión'},
+    {req:'escribe un post de LinkedIn sobre automatizar lo aburrido', inst:'redacta el post con gancho y CTA, sin emojis', act:['busco el ángulo y escribo el borrador'], done:'post redactado (280 palabras)', deliver:'Rocky: borrador de LinkedIn listo para aprobar'},
+    {req:'dame 8 ideas de contenido alineadas a la marca', inst:'propón ideas con título y formato', act:['reviso qué temas funcionaron'], done:'8 ideas con título y formato sugerido', deliver:'Rocky: 8 ideas de contenido enviadas'},
+    {req:'adapta el último post para Instagram', inst:'reescribe en tono cercano y agrega hashtags', act:['ajusto el copy y selecciono hashtags'], done:'caption de 60 palabras + 12 hashtags', deliver:'Rocky: versión para Instagram lista'},
+    {req:'revisa el calendario y dime qué falta publicar', inst:'compara la parrilla contra lo ya publicado', act:['cruzo la parrilla con el historial'], done:'faltan 2 publicaciones del jueves', deliver:'Rocky: pendientes de la semana identificados'},
+  ],
+  video:[
+    {req:'arma un reel vertical explicando la orquestación de subagentes', inst:'monta el motion graphic narrado con intro y outro de marca', act:['clono la voz y animo las escenas por subagente','agrego intro, outro y subtítulos'], done:'reel listo (orquestacion.mp4)', deliver:'Rocky: reel terminado y enviado por Telegram'},
+    {req:'convierte esta idea en un video corto narrado', inst:'genera escenas, narra con voz clonada y exporta vertical', act:['genero las escenas y la narración'], done:'video 1080×1920 exportado', deliver:'Rocky: video corto listo para publicar'},
+    {req:'ponle b-roll a la última grabación', inst:'inserta b-roll de Pexels en los cortes', act:['busco clips libres de derechos y los inserto'], done:'b-roll integrado en 6 cortes', deliver:'Rocky: video con b-roll listo'},
+    {req:'hazme la portada del próximo video', inst:'arma el thumbnail vertical con titular amarillo', act:['tomo el primer frame de habla y compongo'], done:'portada lista (estilo A+D)', deliver:'Rocky: portada del video enviada'},
+  ],
+  diseno:[
+    {req:'genera un brandbook para un cliente nuevo', inst:'corre Monica Designer y arma el brandbook', act:['defino paleta, tipografías y logo','compilo el brandbook en ZIP'], done:'brandbook entregado (brandbook.zip)', deliver:'Rocky: brandbook listo para descargar'},
+    {req:'dame variaciones de logo para revisar', inst:'genera 4 propuestas de logo', act:['exploro estilos y exporto las variantes'], done:'4 propuestas de logo en PNG', deliver:'Rocky: propuestas de logo enviadas'},
+    {req:'arma una paleta de colores para la marca', inst:'propón una paleta coherente con valores HEX', act:['defino primarios, secundarios y neutros'], done:'paleta de 6 colores con HEX', deliver:'Rocky: paleta de marca lista'},
+  ],
+  finanzas:[
+    {req:'clasifica los movimientos del mes', inst:'categoriza las transacciones y arma el reporte', act:['clasifico 412 movimientos de la cuenta 1234567890','genero el donut y el histograma por cuenta'], done:'PDF del corte mensual listo', deliver:'Rocky: reporte de finanzas enviado por Telegram'},
+    {req:'dime cuánto gasté esta semana por cuenta', inst:'agrupa el gasto por cuenta y total', act:['sumo por cuenta y calculo el total'], done:'gasto total y desglose por cuenta', deliver:'Rocky: resumen de gasto semanal listo'},
+    {req:'arma el reporte de finanzas en PDF', inst:'genera el PDF con gráficos del periodo', act:['compilo el LaTeX con los gráficos'], done:'reporte.pdf generado', deliver:'Rocky: reporte en PDF enviado'},
+    {req:'avísame de gastos fuera de lo normal', inst:'detecta movimientos atípicos del periodo', act:['comparo contra el promedio histórico'], done:'2 movimientos atípicos detectados', deliver:'Rocky: alertas de gasto enviadas'},
+  ],
+  datos:[
+    {req:'busca en mis documentos qué acordamos sobre el proyecto X', inst:'consulta el RAG y resume lo relevante', act:['recupero los fragmentos relevantes','redacto el resumen con citas'], done:'resumen con 3 referencias', deliver:'Rocky: respuesta con fuentes enviada'},
+    {req:'organiza estos archivos en Drive', inst:'clasifica y sube a la carpeta correcta', act:['ordeno por tipo y subo con rclone'], done:'archivos subidos a gdrive:Rocky/', deliver:'Rocky: archivos organizados en Drive'},
+    {req:'extrae los datos clave de este PDF', inst:'parsea el documento y arma una tabla', act:['leo el PDF y extraigo los campos'], done:'tabla con 18 filas extraída', deliver:'Rocky: datos extraídos en tabla'},
+    {req:'responde esta duda con base en mis notas', inst:'busca en la base de conocimiento y responde', act:['consulto las notas indexadas'], done:'respuesta encontrada en 2 notas', deliver:'Rocky: respuesta basada en tus notas'},
+  ],
+  contenido:[
+    {req:'recórtale las pausas a esta grabación', inst:'aplica el jump-cut automático y exporta', act:['detecto silencios por envelope y corto'], done:'video sin pausas (versión D)', deliver:'Rocky: video recortado listo'},
+    {req:'edita el video y déjalo listo para publicar', inst:'limpia, agrega intro/outro y exporta', act:['corto, ajusto audio y agrego la firma'], done:'edición final exportada', deliver:'Rocky: video editado enviado'},
+    {req:'súbeme este video al portal porque pesa mucho', inst:'procesa la subida grande y publica el link', act:['recibo el archivo y lo proceso'], done:'video procesado en el portal', deliver:'Rocky: link del video listo'},
+  ],
+  diagramas:[
+    {req:'arma un diagrama de cómo funciona la orquestación', inst:'arma un flujo Agustin → Rocky → especialistas y ríndelo a PNG', act:['escribo el .d2 y corro el render'], done:'PNG renderizado (orquestador.png)', deliver:'Rocky: diagrama listo y enviado por Telegram'},
+    {req:'hazme un diagrama del flujo de este proceso', inst:'modela el proceso y exporta a PNG', act:['defino nodos y conexiones en mermaid'], done:'diagrama de flujo exportado', deliver:'Rocky: diagrama de flujo enviado'},
+    {req:'dibuja la arquitectura de la automatización', inst:'arma el diagrama de componentes', act:['estructuro los bloques y los conecto'], done:'diagrama de arquitectura listo', deliver:'Rocky: diagrama de arquitectura enviado'},
+  ],
+  reuniones:[
+    {req:'transcribe la reunión de hoy', inst:'transcribe el audio y guárdalo en Outline', act:['proceso el audio y transcribo','guardo en la colección Reuniones'], done:'transcripción guardada en Outline', deliver:'Rocky: transcripción de la reunión lista'},
+    {req:'dame la transcripción de la última llamada', inst:'recupera la transcripción más reciente', act:['busco la grabación en Outline'], done:'transcripción recuperada', deliver:'Rocky: transcripción enviada'},
+    {req:'guarda lo que se dijo en la reunión', inst:'transcribe y archiva sin resumen', act:['transcribo y archivo el texto'], done:'reunión archivada en Outline', deliver:'Rocky: reunión guardada'},
+  ],
+  bridge:[
+    {req:'conéctate a mi PC y corre la rutina', inst:'entra por Tailscale y ejecuta la tarea', act:['conecto por SSH al equipo','ejecuto la rutina y verifico salida'], done:'rutina ejecutada sin errores', deliver:'Rocky: tarea ejecutada en tu PC'},
+    {req:'dispara el webhook de publicación', inst:'envía el POST al flujo de n8n', act:['mando el POST con el token bearer sk_live_aD93kf02risensible'], done:'ejecución status=success', deliver:'Rocky: publicación disparada y verificada'},
+    {req:'revisa si el servidor está arriba', inst:'verifica el estado de los servicios', act:['consulto el estado por la API'], done:'todos los servicios activos', deliver:'Rocky: servidor operativo'},
+  ],
+  n8ndocs:[
+    {req:'documenta el workflow nuevo de n8n', inst:'describe los nodos y guárdalo en Outline', act:['recorro los nodos y documento cada paso'], done:'documentación del workflow lista', deliver:'Rocky: documentación del flujo guardada'},
+    {req:'explícame qué hace este workflow', inst:'resume el propósito y los pasos del flujo', act:['analizo los nodos y el disparador'], done:'resumen del workflow en 5 pasos', deliver:'Rocky: explicación del flujo enviada'},
+    {req:'revisa la documentación de los flujos', inst:'verifica que esté completa y actualizada', act:['comparo los flujos contra la doc'], done:'documentación al día', deliver:'Rocky: revisión de documentación lista'},
+  ],
+};
+// Encadenamientos naturales: a veces una tarea dispara otra (segundo subagente).
+const CHAINS={diagramas:'video', datos:'contenido', reuniones:'datos', diseno:'redes'};
+
+const rand=a=>a[Math.floor(Math.random()*a.length)];
+const ids=Object.keys(TASKS);
+function buildScenario(){
+  const id=rand(ids), task=rand(TASKS[id]);
+  const steps=[{fn:()=>viz.request('Agustin: '+task.req)}];
+  const addAgent=(aid,t)=>{
+    steps.push({fn:()=>viz.delegate(aid,t.inst)});
+    const acts=t.act.slice(0, Math.random()<0.5?1:t.act.length);
+    acts.forEach(m=>steps.push({fn:()=>viz.agentMsg(aid,m)}));
+    steps.push({fn:()=>viz.done(aid,t.done)});
+    return t;
+  };
+  let last=addAgent(id,task);
+  // ~30% de las veces encadena un segundo especialista si hay relación natural.
+  if(CHAINS[id] && Math.random()<0.3){
+    const id2=CHAINS[id]; last=addAgent(id2,rand(TASKS[id2]));
+  }
+  steps.push({fn:()=>viz.deliver(last.deliver)});
+  return steps;
+}
+
 let playTimers=[];
 const replayBtn=document.getElementById('replayBtn');
-function play(){
+function play(loop){
   playTimers.forEach(clearTimeout);playTimers=[];
   viz.reset();
   replayBtn.disabled=true;
+  const steps=buildScenario();
   let t=0;
-  STEPS.forEach(s=>{t+=s.d;playTimers.push(setTimeout(s.fn,t));});
+  steps.forEach((s,i)=>{t+=(i===0?900:1100+Math.floor(Math.random()*700));playTimers.push(setTimeout(s.fn,t));});
   playTimers.push(setTimeout(()=>{replayBtn.disabled=false;},t+200));
+  // Auto-encadena otro escenario aleatorio tras una pausa.
+  if(loop!==false)playTimers.push(setTimeout(()=>play(true),t+3200));
 }
-replayBtn.onclick=play;
-logEl.onclick=()=>{if(!replayBtn.disabled)play();};
+replayBtn.onclick=()=>play(true);
+logEl.onclick=()=>{if(!replayBtn.disabled)play(true);};
 
 build();
-play();
+play(true);
 </script>
 </body>
 </html>
